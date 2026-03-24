@@ -23,6 +23,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
+    "types": ["@webgpu/types"],
+
     "baseUrl": ".",
     "paths": {
       "@": ["src"],

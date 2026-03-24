@@ -14,6 +14,14 @@ import {
   MultiPassRenderer,
   updateVideoTexture,
 } from './utils/GLUtils';
+import type { IMultiPassRenderer, ITextureHandle } from './utils/RendererInterface';
+import {
+  GPUMultiPassRenderer,
+  gpuLoadTextureFromURL,
+  gpuCreateEmptyTexture,
+  gpuUpdateVideoTexture,
+} from './utils/GPUUtils';
+import { detectWebGPU, type WebGPUDetectResult } from './utils/gpuDetect';
 import { ResizableWindow } from './components/ResizableWindow';
 import type { ResizeWindowCtrlRefType } from './components/ResizableWindow/ResizableWindow';
 
@@ -22,6 +30,11 @@ import FragmentBgShader from './shaders/fragment-bg.glsl?raw';
 import FragmentBgVblurShader from './shaders/fragment-bg-vblur.glsl?raw';
 import FragmentBgHblurShader from './shaders/fragment-bg-hblur.glsl?raw';
 import FragmentMainShader from './shaders/fragment-main.glsl?raw';
+import WgslVertex from './shaders-wgsl/vertex.wgsl?raw';
+import WgslFragBg from './shaders-wgsl/fragment-bg.wgsl?raw';
+import WgslFragVblur from './shaders-wgsl/fragment-bg-vblur.wgsl?raw';
+import WgslFragHblur from './shaders-wgsl/fragment-bg-hblur.wgsl?raw';
+import WgslFragMain from './shaders-wgsl/fragment-main.wgsl?raw';
 import { Controller } from '@react-spring/web';
 
 // import { useResizeObserver } from './utils/useResizeOberver';
@@ -56,7 +69,26 @@ function App() {
     dpr: 1,
   });
 
+  // WebGPU detection
+  const [webgpuDetect, setWebgpuDetect] = useState<WebGPUDetectResult | null>(null);
+  const [rendererBackend, setRendererBackend] = useState<'webgl' | 'webgpu'>('webgl');
+  // Incrementing key forces React to remount the <canvas>, giving us a fresh element
+  // with no prior context (needed because WebGL/WebGPU contexts are mutually exclusive)
+  const [canvasKey, setCanvasKey] = useState(0);
+
+  useEffect(() => {
+    detectWebGPU().then(setWebgpuDetect);
+  }, []);
+
   const { controls, lang, langName, levaGlobal, controlsAPI } = useLevaControls({
+    rendererOptions: {
+      webgpuSupported: webgpuDetect?.supported ?? false,
+      webgpuUnavailableReason: webgpuDetect?.reason,
+      onRendererChange: (backend) => {
+        setRendererBackend(backend);
+        setCanvasKey((k) => k + 1);
+      },
+    },
     containerRender: {
       /* eslint-disable react-hooks/rules-of-hooks */
       bgType: ({ value, setValue }) => {
@@ -217,12 +249,15 @@ function App() {
     mouseSpring: Controller<{ x: number; y: number }>;
     mouseSpringSpeed: { x: number; y: number };
     bgTextureUrl: string | null;
-    bgTexture: WebGLTexture | null;
+    bgTexture: ITextureHandle | null;
     bgTextureRatio: number;
     bgTextureType: 'image' | 'video' | null;
     bgTextureReady: boolean;
     bgVideoEls: Map<number, HTMLVideoElement>;
     langName: typeof langName;
+    rendererBackend: 'webgl' | 'webgpu';
+    activeRenderer: IMultiPassRenderer | null;
+    gpuDevice: GPUDevice | null;
   }>({
     canvasWindowCtrlRef: null,
     renderRaf: null,
@@ -287,6 +322,9 @@ function App() {
     bgTextureReady: false,
     bgVideoEls: new Map(),
     langName: langName,
+    rendererBackend: 'webgl',
+    activeRenderer: null,
+    gpuDevice: null,
   });
   stateRef.current.canvasInfo = canvasInfo;
   stateRef.current.controls = controls;
@@ -338,74 +376,111 @@ function App() {
     canvasRef.current.height = canvasInfo.height * canvasInfo.dpr;
   }, [canvasInfo]);
 
+  // Sync rendererBackend to stateRef
+  stateRef.current.rendererBackend = rendererBackend;
+
+  // Helper: create WebGL renderer
+  const createWebGLRenderer = useCallback((canvasEl: HTMLCanvasElement) => {
+    const gl = canvasEl.getContext('webgl2');
+    if (!gl) return null;
+    return new MultiPassRenderer(canvasEl, [
+      { name: 'bgPass', shader: { vertex: VertexShader, fragment: FragmentBgShader } },
+      { name: 'vBlurPass', shader: { vertex: VertexShader, fragment: FragmentBgVblurShader }, inputs: { u_prevPassTexture: 'bgPass' } },
+      { name: 'hBlurPass', shader: { vertex: VertexShader, fragment: FragmentBgHblurShader }, inputs: { u_prevPassTexture: 'vBlurPass' } },
+      { name: 'mainPass', shader: { vertex: VertexShader, fragment: FragmentMainShader }, inputs: { u_blurredBg: 'hBlurPass', u_bg: 'bgPass' }, outputToScreen: true },
+    ]);
+  }, []);
+
+  // Helper: create WebGPU renderer
+  const createWebGPURenderer = useCallback((canvasEl: HTMLCanvasElement, device: GPUDevice) => {
+    return new GPUMultiPassRenderer(canvasEl, [
+      { name: 'bgPass', shader: { vertex: WgslVertex, fragment: WgslFragBg } },
+      { name: 'vBlurPass', shader: { vertex: WgslVertex, fragment: WgslFragVblur }, inputs: { u_prevPassTexture: 'bgPass' } },
+      { name: 'hBlurPass', shader: { vertex: WgslVertex, fragment: WgslFragHblur }, inputs: { u_prevPassTexture: 'vBlurPass' } },
+      { name: 'mainPass', shader: { vertex: WgslVertex, fragment: WgslFragMain }, inputs: { u_blurredBg: 'hBlurPass', u_bg: 'bgPass' }, outputToScreen: true },
+    ], device);
+  }, []);
+
+  // Effect: handle backend switch (and initial creation)
+  // Depends on canvasKey so it re-runs after React remounts the <canvas>
   useEffect(() => {
-    if (!canvasRef.current) {
-      return;
+    if (!canvasRef.current) return;
+
+    // Dispose old renderer
+    if (stateRef.current.activeRenderer) {
+      stateRef.current.activeRenderer.dispose();
+      stateRef.current.activeRenderer = null;
     }
 
+    // Clear old texture (it's tied to old context)
+    stateRef.current.bgTexture = null;
+    stateRef.current.bgTextureReady = false;
+    // Force the render loop to re-detect bgTextureUrl change and reload the texture.
+    // Save and restore via a microtask so the render loop sees a null→url transition.
+    const savedBgTextureUrl = stateRef.current.bgTextureUrl;
+    const savedBgTextureType = stateRef.current.bgTextureType;
+    stateRef.current.bgTextureUrl = null;
+    stateRef.current.bgTextureType = null;
+
     const canvasEl = canvasRef.current;
+
+    // Attach pointer listener on the (possibly new) canvas
     const onPointerMove = (e: PointerEvent) => {
-      const canvasInfo = stateRef.current.canvasInfo;
-      if (!canvasInfo) {
-        return;
-      }
+      const ci = stateRef.current.canvasInfo;
+      if (!ci) return;
       stateRef.current.canvasPointerPos = {
-        x: (e.clientX - stateRef.current.canvasPos.x) * canvasInfo.dpr,
-        y:
-          (stateRef.current.canvasInfo.height - (e.clientY - stateRef.current.canvasPos.y)) *
-          canvasInfo.dpr,
+        x: (e.clientX - stateRef.current.canvasPos.x) * ci.dpr,
+        y: (ci.height - (e.clientY - stateRef.current.canvasPos.y)) * ci.dpr,
       };
       stateRef.current.mouseSpring.start(stateRef.current.canvasPointerPos);
     };
     canvasEl.addEventListener('pointermove', onPointerMove);
 
-    const gl = canvasEl.getContext('webgl2');
-    if (!gl) {
-      return;
+    if (rendererBackend === 'webgpu' && webgpuDetect?.supported && webgpuDetect.device) {
+      stateRef.current.gpuDevice = webgpuDetect.device;
+      try {
+        const renderer = createWebGPURenderer(canvasEl, webgpuDetect.device);
+        stateRef.current.activeRenderer = renderer;
+      } catch (e) {
+        console.error('Failed to create WebGPU renderer, falling back to WebGL:', e);
+        const renderer = createWebGLRenderer(canvasEl);
+        stateRef.current.activeRenderer = renderer;
+      }
+    } else {
+      stateRef.current.gpuDevice = null;
+      const renderer = createWebGLRenderer(canvasEl);
+      stateRef.current.activeRenderer = renderer;
     }
 
-    const renderer = new MultiPassRenderer(canvasEl, [
-      {
-        name: 'bgPass',
-        shader: {
-          vertex: VertexShader,
-          fragment: FragmentBgShader,
-        },
-      },
-      {
-        name: 'vBlurPass',
-        shader: {
-          vertex: VertexShader,
-          fragment: FragmentBgVblurShader,
-        },
-        inputs: {
-          u_prevPassTexture: 'bgPass',
-        },
-      },
-      {
-        name: 'hBlurPass',
-        shader: {
-          vertex: VertexShader,
-          fragment: FragmentBgHblurShader,
-        },
-        inputs: {
-          u_prevPassTexture: 'vBlurPass',
-        },
-      },
-      {
-        name: 'mainPass',
-        shader: {
-          vertex: VertexShader,
-          fragment: FragmentMainShader,
-        },
-        inputs: {
-          u_blurredBg: 'hBlurPass',
-          u_bg: 'bgPass',
-        },
-        outputToScreen: true,
-      },
-    ]);
+    // The new canvas (from key change) starts at default 300x150.
+    // Apply current canvasInfo dimensions and force a renderer resize.
+    const ci = stateRef.current.canvasInfo;
+    canvasEl.width = ci.width * ci.dpr;
+    canvasEl.height = ci.height * ci.dpr;
+    if (stateRef.current.activeRenderer) {
+      const w = ci.width * ci.dpr;
+      const h = ci.height * ci.dpr;
+      if (stateRef.current.rendererBackend === 'webgl') {
+        const gl = canvasEl.getContext('webgl2');
+        gl?.viewport(0, 0, Math.round(w), Math.round(h));
+      }
+      stateRef.current.activeRenderer.resize(w, h);
+      stateRef.current.activeRenderer.setUniform('u_resolution', [w, h]);
+    }
 
+    // Restore the background texture URL so the render loop detects the
+    // null→url transition on the next frame and reloads the texture.
+    requestAnimationFrame(() => {
+      stateRef.current.bgTextureUrl = savedBgTextureUrl;
+      stateRef.current.bgTextureType = savedBgTextureType;
+    });
+
+    return () => {
+      canvasEl.removeEventListener('pointermove', onPointerMove);
+    };
+  }, [rendererBackend, canvasKey, webgpuDetect, createWebGLRenderer, createWebGPURenderer]);
+
+  useEffect(() => {
     let raf: number | null = null;
     const lastState = {
       canvasInfo: null as typeof canvasInfo | null,
@@ -413,39 +488,36 @@ function App() {
       bgTextureType: null as typeof stateRef.current.bgTextureType,
       bgTextureUrl: null as typeof stateRef.current.bgTextureUrl,
     };
-    // let startTime: number | null = null
     const render = () => {
       raf = requestAnimationFrame(render);
 
-      // let time = 0;
-      // if (!startTime) {
-      //   startTime = t;
-      // } else {
-      //   time = t - startTime;
-      // }
+      const renderer = stateRef.current.activeRenderer;
+      if (!renderer) return;
 
-      // console.log(time);
+      const canvasEl = canvasRef.current;
+      if (!canvasEl) return;
 
+      const backend = stateRef.current.rendererBackend;
       const canvasInfo = stateRef.current.canvasInfo;
       const textureUrl = stateRef.current.bgTextureUrl;
+
       if (
         !lastState.canvasInfo ||
         lastState.canvasInfo.width !== canvasInfo.width ||
         lastState.canvasInfo.height !== canvasInfo.height ||
         lastState.canvasInfo.dpr !== canvasInfo.dpr
       ) {
-        gl.viewport(
-          0,
-          0,
-          Math.round(canvasInfo.width * canvasInfo.dpr),
-          Math.round(canvasInfo.height * canvasInfo.dpr),
-        );
+        if (backend === 'webgl') {
+          const gl = canvasEl.getContext('webgl2');
+          if (gl) {
+            gl.viewport(0, 0, Math.round(canvasInfo.width * canvasInfo.dpr), Math.round(canvasInfo.height * canvasInfo.dpr));
+          }
+        }
         renderer.resize(canvasInfo.width * canvasInfo.dpr, canvasInfo.height * canvasInfo.dpr);
-        renderer.setUniform('u_resolution', [
-          canvasInfo.width * canvasInfo.dpr,
-          canvasInfo.height * canvasInfo.dpr,
-        ]);
+        renderer.setUniform('u_resolution', [canvasInfo.width * canvasInfo.dpr, canvasInfo.height * canvasInfo.dpr]);
       }
+
+      // Texture management
       if (textureUrl !== lastState.bgTextureUrl) {
         if (lastState.bgTextureType === 'video') {
           if (lastState.controls?.bgType !== undefined) {
@@ -454,26 +526,50 @@ function App() {
         }
         if (!textureUrl) {
           if (stateRef.current.bgTexture) {
-            gl.deleteTexture(stateRef.current.bgTexture);
+            if (backend === 'webgl') {
+              const gl = canvasEl.getContext('webgl2');
+              gl?.deleteTexture(stateRef.current.bgTexture as WebGLTexture);
+            } else {
+              (stateRef.current.bgTexture as GPUTexture)?.destroy();
+            }
             stateRef.current.bgTexture = null;
             stateRef.current.bgTextureType = null;
           }
         } else {
           if (stateRef.current.bgTextureType === 'image') {
-            const rafId = requestAnimationFrame(() => {
-              stateRef.current.bgTextureReady = false;
-            });
-            loadTextureFromURL(gl, textureUrl).then(({ texture, ratio }) => {
-              if (stateRef.current.bgTextureUrl === textureUrl) {
-                cancelAnimationFrame(rafId);
-                stateRef.current.bgTexture = texture;
-                stateRef.current.bgTextureRatio = ratio;
-                stateRef.current.bgTextureReady = true;
+            const rafId = requestAnimationFrame(() => { stateRef.current.bgTextureReady = false; });
+            if (backend === 'webgl') {
+              const gl = canvasEl.getContext('webgl2');
+              if (gl) {
+                loadTextureFromURL(gl, textureUrl).then(({ texture, ratio }) => {
+                  if (stateRef.current.bgTextureUrl === textureUrl) {
+                    cancelAnimationFrame(rafId);
+                    stateRef.current.bgTexture = texture;
+                    stateRef.current.bgTextureRatio = ratio;
+                    stateRef.current.bgTextureReady = true;
+                  }
+                });
               }
-            });
+            } else if (stateRef.current.gpuDevice) {
+              gpuLoadTextureFromURL(stateRef.current.gpuDevice, textureUrl).then(({ texture, ratio }) => {
+                if (stateRef.current.bgTextureUrl === textureUrl) {
+                  cancelAnimationFrame(rafId);
+                  stateRef.current.bgTexture = texture;
+                  stateRef.current.bgTextureRatio = ratio;
+                  stateRef.current.bgTextureReady = true;
+                }
+              });
+            }
           } else if (stateRef.current.bgTextureType === 'video') {
             stateRef.current.bgTextureReady = false;
-            stateRef.current.bgTexture = createEmptyTexture(gl);
+            if (backend === 'webgl') {
+              const gl = canvasEl.getContext('webgl2');
+              if (gl) {
+                stateRef.current.bgTexture = createEmptyTexture(gl);
+              }
+            } else if (stateRef.current.gpuDevice) {
+              stateRef.current.bgTexture = gpuCreateEmptyTexture(stateRef.current.gpuDevice);
+            }
             stateRef.current.bgVideoEls.get(stateRef.current.controls.bgType)?.play();
           }
         }
@@ -483,20 +579,38 @@ function App() {
       lastState.canvasInfo = canvasInfo;
       lastState.bgTextureUrl = stateRef.current.bgTextureUrl;
 
+      // Video texture update
       if (stateRef.current.bgTextureType === 'video') {
         const videoEl = stateRef.current.bgVideoEls.get(stateRef.current.controls.bgType);
         if (stateRef.current.bgTexture && videoEl) {
-          const info = updateVideoTexture(gl, stateRef.current.bgTexture, videoEl);
-
-          if (info) {
-            stateRef.current.bgTextureRatio = info.ratio;
-            stateRef.current.bgTextureReady = true;
+          if (backend === 'webgl') {
+            const gl = canvasEl.getContext('webgl2');
+            if (gl) {
+              const info = updateVideoTexture(gl, stateRef.current.bgTexture as WebGLTexture, videoEl);
+              if (info) {
+                stateRef.current.bgTextureRatio = info.ratio;
+                stateRef.current.bgTextureReady = true;
+              }
+            }
+          } else if (stateRef.current.gpuDevice) {
+            gpuUpdateVideoTexture(stateRef.current.gpuDevice, stateRef.current.bgTexture as GPUTexture, videoEl).then((info) => {
+              if (info) {
+                stateRef.current.bgTexture = info.texture;
+                stateRef.current.bgTextureRatio = info.ratio;
+                stateRef.current.bgTextureReady = true;
+              }
+            });
           }
         }
       }
 
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      if (backend === 'webgl') {
+        const gl = canvasEl.getContext('webgl2');
+        if (gl) {
+          gl.clearColor(0, 0, 0, 0);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        }
+      }
 
       const controls = stateRef.current.controls;
       const mouseSpring = stateRef.current.mouseSpring.get();
@@ -572,7 +686,6 @@ function App() {
     raf = requestAnimationFrame(render);
 
     return () => {
-      canvasEl.removeEventListener('pointermove', onPointerMove);
       if (raf) {
         cancelAnimationFrame(raf);
       }
@@ -631,6 +744,7 @@ function App() {
       >
         <div className={clsx(styles.canvasContainer)}>
           <canvas
+            key={canvasKey}
             ref={canvasRef}
             className={styles.canvas}
             style={

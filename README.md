@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README-zh.md) | [O‘zbekcha](README-uz.md)
 
-The Ultimate Web Recreation of Apple’s Liquid Glass UI, powered by WebGL2 and shaders. Includes most Liquid Glass features with fine-grained controls for detailed customization.
+The Ultimate Web Recreation of Apple’s Liquid Glass UI, powered by WebGL2 & WebGPU. Includes most Liquid Glass features with fine-grained controls for detailed customization.
 
 ## Online Demo
 
@@ -54,7 +54,7 @@ https://liquid-glass.iyinchao.cn/
 
 ## Technical Highlights
 
-- WebGL-based rendering for high-performance graphics
+- WebGL2 / WebGPU dual-backend rendering for high-performance graphics
 - Multipass rendering for high-quality & performant Gaussian blur
 - Using SDF Defined shapes and smooth merge function
 - Custom shader implementations for realistic glass effects
@@ -84,7 +84,7 @@ pnpm build
 
 - [x] More Glare Controls (hardness / color / size etc.)
 - [x] Custom Background
-- [ ] Render with WebGPU
+- [x] Render with WebGPU
 - [ ] Editor mode
 - [ ] Glass Text Rendering
 - [ ] Glass Presets

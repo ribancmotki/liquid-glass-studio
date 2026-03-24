@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README-zh.md)
 
-WebGL2 va shaderlar asosida yaratilgan Apple’ning Liquid Glass (suyuq shisha) effektining to‘liq veb talqini.
+WebGL2 & WebGPU va shaderlar asosida yaratilgan Apple’ning Liquid Glass (suyuq shisha) effektining to’liq veb talqini.
 Sozlanadigan parametrlar orqali siz barcha “liquid glass” effektlarini sinab ko‘rishingiz mumkin.
 
 ## Online Demo
@@ -58,7 +58,7 @@ https://liquid-glass.iyinchao.cn/
 
 ## Texnik jihatlar
 
-- Yuqori samarali grafikani ta’minlash uchun WebGL texnologiyasiga asoslangan tasvirlash usuli
+- Yuqori samarali grafikani ta’minlash uchun WebGL2 / WebGPU ikki tomonlama renderlash usuli
 - Ko‘p bosqichli renderlash yordamida yuqori sifatli va samarali Gauss xiralashtirish amalga oshiriladi
 - SDF shakllar va silliq birlashtirish (smooth) funksiyasidan foydalanish
 - Haqiqiy shisha effektlarini yaratish uchun maxsus shaderlar
@@ -88,7 +88,7 @@ pnpm build
 
 - [x] Yaltirash (porlash) effektini yanada ko‘proq boshqarish (porlash qanchalik tarqalgan yoki keskin bo‘lishi, rang, o‘lcham va boshqalar).
 - [x] O'zingiz xoxlagan fonni yuklash imkoniyati
-- [ ] WebGPU orqali render qilish
+- [x] WebGPU orqali render qilish
 - [ ] Tahrirlash rejimi
 - [ ] Shisha matn
 - [ ] Shisha uchun tayyor andozalar

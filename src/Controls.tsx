@@ -9,9 +9,15 @@ import languages from './utils/languages';
 
 export const useLevaControls = ({
   containerRender,
+  rendererOptions,
 }: {
   containerRender: {
     bgType: (props: { value: number; setValue: (v: number) => void }) => React.ReactNode;
+  };
+  rendererOptions?: {
+    webgpuSupported: boolean;
+    webgpuUnavailableReason?: string;
+    onRendererChange?: (backend: 'webgl' | 'webgpu') => void;
   };
 }) => {
   const [langName, setLangName] = useState<keyof typeof languages>(
@@ -24,6 +30,25 @@ export const useLevaControls = ({
   const [controls, controlsAPI] = useControls(
     () => ({
       ['basicSettings']: folder({
+        renderer: LevaCheckButtons({
+          label: lang['editor.renderer'],
+          selected: ['webgl'],
+          options: [
+            { value: 'webgl', label: 'WebGL' },
+            {
+              value: 'webgpu',
+              label: 'WebGPU',
+              disabled: !rendererOptions?.webgpuSupported,
+              title: !rendererOptions?.webgpuSupported
+                ? (rendererOptions?.webgpuUnavailableReason || lang['editor.rendererWebGPUUnavailable'])
+                : undefined,
+            },
+          ],
+          singleMode: true,
+          onClick: (v) => {
+            rendererOptions?.onRendererChange?.(v[0] as 'webgl' | 'webgpu');
+          },
+        }),
         language: LevaCheckButtons({
           label: lang['editor.language'],
           selected: [langName],
@@ -240,7 +265,7 @@ export const useLevaControls = ({
         collapsed: true
       }),
     }),
-    [langName],
+    [langName, rendererOptions?.webgpuSupported],
   );
 
   useLayoutEffect(() => {

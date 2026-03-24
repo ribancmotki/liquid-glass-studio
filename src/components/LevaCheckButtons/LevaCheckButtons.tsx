@@ -7,7 +7,7 @@ import { LevaButton } from '../LevaButton';
 const { Row, Label } = Components;
 
 type CheckButtonsSettings = {
-  options: { value: string; label?: string; disabled?: boolean; }[];
+  options: { value: string; label?: string; disabled?: boolean; title?: string; }[];
   singleMode?: boolean;
   onClick?: (v: string[]) => void;
 }
@@ -35,6 +35,7 @@ function LevaCheckButtonsComponent() {
               // active={isSelected}
               intent={isSelected ? 'primary' : 'normal'}
               disabled={option.disabled}
+              title={option.title}
               key={option.value}
               onClick={() => {
                 if (option.disabled) {
