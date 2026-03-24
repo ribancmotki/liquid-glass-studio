@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README-zh.md)
 
-Apple Liquid Glass UI 在 Web 平台上的高保真还原，基于 WebGL2 和 Shader实现。力求涵盖尽可能多的 Liquid Glass 特性，并提供细致的参数控制。
+Apple Liquid Glass UI 在 Web 平台上的高保真还原，基于 WebGL2 & WebGPU 实现。力求涵盖尽可能多的 Liquid Glass 特性，并提供细致的参数控制。
 
 ## 在线演示
 
@@ -55,7 +55,7 @@ https://liquid-glass.iyinchao.cn/
 
 ## 技术
 
-- 基于 WebGL 的高性能图形渲染
+- 基于 WebGL2 / WebGPU 双后端的高性能图形渲染
 - 使用多 Pass 渲染，实现高质量高性能的高斯模糊
 - 使用 SDF 定义的形状和平滑合并函数
 - 自定义 Shader 实现真实玻璃质感
@@ -85,9 +85,12 @@ pnpm build
 
 - [x] 更丰富的高光控制选项（硬度 / 颜色 / 大小等）
 - [x] 支持自定义背景
+- [x] 使用 WebGPU 渲染
+- [ ] 编辑器模式
+- [ ] 玻璃文字渲染
+- [ ] 玻璃效果预设
 - [ ] 自发光效果实现
 - [ ] HDR 发光
-- [ ] 玻璃效果预设
 - [x] 控制参数的导入 / 导出功能
 - [x] 渲染步骤查看（展示中间处理结果）
 - [ ] 在玻璃形状中嵌入 UI 内容

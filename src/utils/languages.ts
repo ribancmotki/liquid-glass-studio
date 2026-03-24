@@ -5,7 +5,7 @@ export default {
       numberInputMinWidth: '42px',
       controlWidth: '215px',
     },
-    'ui.subtitle': '基于WebGL2的液态玻璃效果模拟工具',
+    'ui.subtitle': '液态玻璃效果模拟工具(基于WebGL & WebGPU)',
     'editor.basicSettings': '基础设置',
     'editor.language': '语言',
     'editor.refThickness': '折射厚度',
@@ -41,6 +41,8 @@ export default {
     'editor.import': '导入预设',
     'editor.importSuccessMessage': '预设导入成功！',
     'editor.importFailedMessage': (message: string) => `导入失败：${message}`,
+    'editor.renderer': '渲染引擎',
+    'editor.rendererWebGPUUnavailable': 'WebGPU 不可用',
   },
   ['en-US']: {
     '_settings': {
@@ -48,7 +50,7 @@ export default {
       numberInputMinWidth: '42px',
       controlWidth: '215px',
     },
-    'ui.subtitle': 'Liquid Glass Effect Simulation Tool based on WebGL2',
+    'ui.subtitle': 'Liquid Glass Effect Simulation Tool (powered by WebGL & WebGPU)',
     'editor.basicSettings': 'Basic Settings',
     'editor.language': 'Language',
     'editor.refThickness': 'Thickness',
@@ -84,6 +86,8 @@ export default {
     'editor.import': 'Import Preset',
     'editor.importSuccessMessage': 'Preset imported successfully!',
     'editor.importFailedMessage': (message: string) => `Import failed: ${message}`,
+    'editor.renderer': 'Renderer',
+    'editor.rendererWebGPUUnavailable': 'WebGPU not available',
   },
   ['uz-UZ']: {
     '_settings': {
@@ -91,7 +95,7 @@ export default {
       "numberInputMinWidth": "42px",
       "controlWidth": "215px"
     },
-    "ui.subtitle": "WebGL2 asosidagi Liquid Glass effekt simulyatori",
+    "ui.subtitle": "Liquid Glass effekt simulyatori (WebGL & WebGPU asosida)",
     "editor.basicSettings": "Asosiy sozlamalar",
     "editor.language": "Til",
     "editor.refThickness": "Qalinlik",
@@ -127,5 +131,7 @@ export default {
     "editor.import": "Presetni import qilish",
     "editor.importSuccessMessage": "Preset muvaffaqiyatli import qilindi!",
     "editor.importFailedMessage": (message: string) => `Import failed: ${message}`,
+    "editor.renderer": "Renderer",
+    "editor.rendererWebGPUUnavailable": "WebGPU mavjud emas",
   }
 }
