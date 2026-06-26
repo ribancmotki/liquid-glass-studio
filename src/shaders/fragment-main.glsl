@@ -41,6 +41,7 @@ uniform int STEP;
 out vec4 fragColor;
 
 #include './lib/sdf.glsl'
+#include './lib/math.glsl'
 
 // Superellipse SDF — currently unused (referenced only in commented-out code),
 // kept here for reference / future shape support.
@@ -207,8 +208,8 @@ void main() {
       float nmerged = -1.0 * (merged * u_resolution1x.y);
 
       float x_R_ratio = 1.0 - nmerged / u_refThickness;
-      float thetaI = asin(pow(x_R_ratio, 2.0));
-      float thetaT = asin(1.0 / u_refFactor * sin(thetaI));
+      float thetaI = safeAsin(pow(x_R_ratio, 2.0));
+      float thetaT = safeAsin(1.0 / u_refFactor * sin(thetaI));
       float edgeFactor = -1.0 * tan(thetaT - thetaI);
       if (nmerged >= u_refThickness) {
         edgeFactor = 0.0;
@@ -230,8 +231,8 @@ void main() {
       float nmerged = -1.0 * (merged * u_resolution1x.y);
 
       float x_R_ratio = 1.0 - nmerged / u_refThickness;
-      float thetaI = asin(pow(x_R_ratio, 2.0));
-      float thetaT = asin(1.0 / u_refFactor * sin(thetaI));
+      float thetaI = safeAsin(pow(x_R_ratio, 2.0));
+      float thetaT = safeAsin(1.0 / u_refFactor * sin(thetaI));
       float edgeFactor = -1.0 * tan(thetaT - thetaI);
       if (nmerged >= u_refThickness) {
         edgeFactor = 0.0;
@@ -254,8 +255,8 @@ void main() {
       float nmerged = -1.0 * (merged * u_resolution1x.y);
 
       float x_R_ratio = 1.0 - nmerged / u_refThickness;
-      float thetaI = asin(pow(x_R_ratio, 2.0));
-      float thetaT = asin(1.0 / u_refFactor * sin(thetaI));
+      float thetaI = safeAsin(pow(x_R_ratio, 2.0));
+      float thetaT = safeAsin(1.0 / u_refFactor * sin(thetaI));
       float edgeFactor = -1.0 * tan(thetaT - thetaI);
       // Will have value > 0 inside of shape, force normalize here
       if (nmerged >= u_refThickness) {
@@ -289,8 +290,8 @@ void main() {
       float nmerged = -1.0 * (merged * u_resolution1x.y);
 
       float x_R_ratio = 1.0 - nmerged / u_refThickness;
-      float thetaI = asin(pow(x_R_ratio, 2.0));
-      float thetaT = asin(1.0 / u_refFactor * sin(thetaI));
+      float thetaI = safeAsin(pow(x_R_ratio, 2.0));
+      float thetaT = safeAsin(1.0 / u_refFactor * sin(thetaI));
       float edgeFactor = -1.0 * tan(thetaT - thetaI);
       // Will have value > 0 inside of shape, force normalize here
       if (nmerged >= u_refThickness) {
@@ -349,8 +350,8 @@ void main() {
       float nmerged = -1.0 * (merged * u_resolution1x.y);
 
       float x_R_ratio = 1.0 - nmerged / u_refThickness;
-      float thetaI = asin(pow(x_R_ratio, 2.0));
-      float thetaT = asin(1.0 / u_refFactor * sin(thetaI));
+      float thetaI = safeAsin(pow(x_R_ratio, 2.0));
+      float thetaT = safeAsin(1.0 / u_refFactor * sin(thetaI));
       float edgeFactor = -1.0 * tan(thetaT - thetaI);
       // Will have value > 0 inside of shape, force normalize here
       if (nmerged >= u_refThickness) {
@@ -464,8 +465,8 @@ void main() {
 
       // calculate refraction edge factor:
       float x_R_ratio = 1.0 - nmerged / u_refThickness;
-      float thetaI = asin(pow(x_R_ratio, 2.0));
-      float thetaT = asin(1.0 / u_refFactor * sin(thetaI));
+      float thetaI = safeAsin(pow(x_R_ratio, 2.0));
+      float thetaT = safeAsin(1.0 / u_refFactor * sin(thetaI));
       float edgeFactor = -1.0 * tan(thetaT - thetaI);
       // Will have value > 0 inside of shape, force normalize here
       if (nmerged >= u_refThickness) {

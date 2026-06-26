@@ -48,6 +48,7 @@ struct Uniforms {
 @group(0) @binding(3) var u_sampler: sampler;
 
 #include './lib/sdf.wgsl'
+#include './lib/math.wgsl'
 
 fn getNormal(p1: vec2f, p2: vec2f, p: vec2f) -> vec2f {
   // dFdx(gl_FragCoord.x) = 1.0 on a fullscreen quad, so eps = 1.0
@@ -119,9 +120,8 @@ fn fs_main(@builtin(position) frag_coord: vec4f, @location(0) v_uv: vec2f) -> @l
 
     // calculate refraction edge factor
     let x_R_ratio = 1.0 - nmerged / u.u_refThickness;
-    // Clamp asin inputs to [-1,1] — in GLSL asin silently clamps, in WGSL it returns NaN
-    let thetaI = asin(clamp(pow(x_R_ratio, 2.0), -1.0, 1.0));
-    let thetaT = asin(clamp(1.0 / u.u_refFactor * sin(thetaI), -1.0, 1.0));
+    let thetaI = safeAsin(pow(x_R_ratio, 2.0));
+    let thetaT = safeAsin(1.0 / u.u_refFactor * sin(thetaI));
     var edgeFactor = -1.0 * tan(thetaT - thetaI);
     if (nmerged >= u.u_refThickness) {
       edgeFactor = 0.0;
