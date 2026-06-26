@@ -25,16 +25,16 @@ import { detectWebGPU, type WebGPUDetectResult } from './utils/gpuDetect';
 import { ResizableWindow } from './components/ResizableWindow';
 import type { ResizeWindowCtrlRefType } from './components/ResizableWindow/ResizableWindow';
 
-import VertexShader from './shaders/vertex.glsl?raw';
-import FragmentBgShader from './shaders/fragment-bg.glsl?raw';
-import FragmentBgVblurShader from './shaders/fragment-bg-vblur.glsl?raw';
-import FragmentBgHblurShader from './shaders/fragment-bg-hblur.glsl?raw';
-import FragmentMainShader from './shaders/fragment-main.glsl?raw';
-import WgslVertex from './shaders-wgsl/vertex.wgsl?raw';
-import WgslFragBg from './shaders-wgsl/fragment-bg.wgsl?raw';
-import WgslFragVblur from './shaders-wgsl/fragment-bg-vblur.wgsl?raw';
-import WgslFragHblur from './shaders-wgsl/fragment-bg-hblur.wgsl?raw';
-import WgslFragMain from './shaders-wgsl/fragment-main.wgsl?raw';
+import VertexShader from './shaders/vertex.glsl';
+import FragmentBgShader from './shaders/fragment-bg.glsl';
+import FragmentBgVblurShader from './shaders/fragment-bg-vblur.glsl';
+import FragmentBgHblurShader from './shaders/fragment-bg-hblur.glsl';
+import FragmentMainShader from './shaders/fragment-main.glsl';
+import WgslVertex from './shaders-wgsl/vertex.wgsl';
+import WgslFragBg from './shaders-wgsl/fragment-bg.wgsl';
+import WgslFragVblur from './shaders-wgsl/fragment-bg-vblur.wgsl';
+import WgslFragHblur from './shaders-wgsl/fragment-bg-hblur.wgsl';
+import WgslFragMain from './shaders-wgsl/fragment-main.wgsl';
 import { Controller } from '@react-spring/web';
 
 // import { useResizeObserver } from './utils/useResizeOberver';

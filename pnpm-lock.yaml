@@ -84,6 +84,9 @@ importers:
       vite:
         specifier: ^6.3.5
         version: 6.3.5(sass@1.89.2)
+      vite-plugin-glsl:
+        specifier: ^1.6.0
+        version: 1.6.0(esbuild@0.25.5)(vite@6.3.5(sass@1.89.2))
       vite-tsconfig-paths:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.8.3)(vite@6.3.5(sass@1.89.2))
@@ -1752,6 +1755,19 @@ packages:
 
   v8n@1.5.1:
     resolution: {integrity: sha512-LdabyT4OffkyXFCe9UT+uMkxNBs5rcTVuZClvxQr08D5TUgo1OFKkoT65qYRCsiKBl/usHjpXvP4hHMzzDRj3A==}
+
+  vite-plugin-glsl@1.6.0:
+    resolution: {integrity: sha512-3i3ZvIVb13LhTcAXEHGTOW+cNG2jbJ++XsDFyCWUpnoFN1NPXvdtC4j66pig+i0QjDnmusOK/YCpiDWizxBY0A==}
+    engines: {node: '>= 20.17.0', npm: '>= 10.8.3'}
+    peerDependencies:
+      '@rollup/pluginutils': ^5.x
+      esbuild: '>= 0.25'
+      vite: '>= 3.x'
+    peerDependenciesMeta:
+      '@rollup/pluginutils':
+        optional: true
+      esbuild:
+        optional: true
 
   vite-tsconfig-paths@5.1.4:
     resolution: {integrity: sha512-cYj0LRuLV2c2sMqhqhGpaO3LretdtMn/BVX4cPLanIZuwwrkVl+lK84E/miEXkCHWXuq65rhNN4rXsBcOB3S4w==}
@@ -3441,6 +3457,12 @@ snapshots:
       '@types/react': 19.1.8
 
   v8n@1.5.1: {}
+
+  vite-plugin-glsl@1.6.0(esbuild@0.25.5)(vite@6.3.5(sass@1.89.2)):
+    dependencies:
+      vite: 6.3.5(sass@1.89.2)
+    optionalDependencies:
+      esbuild: 0.25.5
 
   vite-tsconfig-paths@5.1.4(typescript@5.8.3)(vite@6.3.5(sass@1.89.2)):
     dependencies:
