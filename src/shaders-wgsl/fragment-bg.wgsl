@@ -1,6 +1,3 @@
-// Background pass fragment shader for WebGPU
-// Ported from fragment-bg.glsl
-
 struct Uniforms {
   u_resolution: vec2f,
   u_dpr: f32,
@@ -22,7 +19,6 @@ struct Uniforms {
   u_showShape1: i32,
   u_blurRadius: i32,
   u_blurEdge: i32,
-  // main pass uniforms (unused here but in same buffer)
   u_tint: vec4f,
   u_refThickness: f32,
   u_refFactor: f32,
@@ -43,8 +39,13 @@ struct Uniforms {
 @group(0) @binding(2) var u_sampler: sampler;
 
 fn chessboard(uv: vec2f, size: f32, mode: i32) -> f32 {
-  let yBars = step(size * 2.0, (uv.y * 2.0) % (size * 4.0));
-  let xBars = step(size * 2.0, (uv.x * 2.0) % (size * 4.0));
+  let period = size * 4.0;
+  let yValue = uv.y * 2.0;
+  let xValue = uv.x * 2.0;
+  let yRemainder = yValue - period * floor(yValue / period);
+  let xRemainder = xValue - period * floor(xValue / period);
+  let yBars = select(0.0, 1.0, yRemainder >= size * 2.0);
+  let xBars = select(0.0, 1.0, xRemainder >= size * 2.0);
   if (mode == 0) {
     return yBars;
   } else if (mode == 1) {
@@ -78,41 +79,41 @@ fn getCoverUV(uv_in: vec2f, canvasAspect: f32, textureAspect: f32) -> vec2f {
 
 @fragment
 fn fs_main(@builtin(position) frag_coord: vec4f, @location(0) v_uv: vec2f) -> @location(0) vec4f {
-  let u_resolution1x = u.u_resolution / u.u_dpr;
+  let safeDpr = max(abs(u.u_dpr), 0.000001);
+  let safeResolution = max(abs(u.u_resolution), vec2f(0.000001));
+  let safeShadowExpand = max(abs(u.u_shadowExpand), 0.000001);
+  let safeTextureRatio = max(abs(u.u_bgTextureRatio), 0.000001);
+  let u_resolution1x = safeResolution / safeDpr;
   var bgColor = vec3f(1.0);
-
-  // frag_coord.y is top-down in WebGPU; flip to get GLSL-style bottom-up pixel coords
-  let pixel = vec2f(frag_coord.x, u.u_resolution.y - frag_coord.y);
-  // v_uv has y=0 at top (WebGPU convention); compute GLSL-style uv with y=0 at bottom
+  let pixel = vec2f(frag_coord.x, safeResolution.y - frag_coord.y);
   let gl_uv = vec2f(v_uv.x, 1.0 - v_uv.y);
 
   if (u.u_bgType <= 0) {
-    bgColor = vec3f(1.0 - chessboard(pixel / u.u_dpr, 20.0, 2) / 4.0);
+    bgColor = vec3f(1.0 - chessboard(pixel / safeDpr, 20.0, 2) / 4.0);
   } else if (u.u_bgType <= 1) {
     if (gl_uv.x < 0.5 && gl_uv.y > 0.5) {
-      bgColor = vec3f(chessboard(pixel / u.u_dpr, 10.0, 0));
+      bgColor = vec3f(chessboard(pixel / safeDpr, 10.0, 0));
     } else if (gl_uv.x > 0.5 && gl_uv.y < 0.5) {
-      bgColor = vec3f(chessboard(pixel / u.u_dpr, 10.0, 1));
+      bgColor = vec3f(chessboard(pixel / safeDpr, 10.0, 1));
     } else if (gl_uv.x < 0.5 && gl_uv.y < 0.5) {
       bgColor = vec3f(0.0);
     }
   } else if (u.u_bgType <= 2) {
-    bgColor = vec3f(halfColor(pixel / u.u_resolution) * 0.6 + 0.3);
+    bgColor = vec3f(halfColor(pixel / safeResolution) * 0.6 + 0.3);
   } else if (u.u_bgType <= 11) {
     if (u.u_bgTextureReady != 1) {
-      bgColor = vec3f(1.0 - chessboard(pixel / u.u_dpr, 20.0, 2) / 4.0);
+      bgColor = vec3f(1.0 - chessboard(pixel / safeDpr, 20.0, 2) / 4.0);
     } else {
-      // v_uv matches WebGPU texture coords (y=0 at top), correct for texture sampling
-      let uv = getCoverUV(v_uv, u.u_resolution.x / u.u_resolution.y, u.u_bgTextureRatio);
+      let uv = getCoverUV(v_uv, safeResolution.x / safeResolution.y, safeTextureRatio);
       bgColor = textureSampleLevel(u_bgTexture, u_sampler, uv, 0.0).rgb;
     }
   }
 
-  // shadow — uses pixel (GLSL-style bottom-up coords) for SDF
-  let p1 = (vec2f(0.0) - u.u_resolution * 0.5 + vec2f(u.u_shadowPosition.x * u.u_dpr, u.u_shadowPosition.y * u.u_dpr)) / u.u_resolution.y;
-  let p2 = (vec2f(0.0) - u.u_mouseSpring + vec2f(u.u_shadowPosition.x * u.u_dpr, u.u_shadowPosition.y * u.u_dpr)) / u.u_resolution.y;
+  let shadowOffset = vec2f(u.u_shadowPosition.x * safeDpr, u.u_shadowPosition.y * safeDpr);
+  let p1 = (vec2f(0.0) - safeResolution * 0.5 + shadowOffset) / safeResolution.y;
+  let p2 = (vec2f(0.0) - u.u_mouseSpring + shadowOffset) / safeResolution.y;
   let merged = mainSDF(p1, p2, pixel);
-  let shadow = exp(-1.0 / u.u_shadowExpand * abs(merged) * u_resolution1x.y) * 0.6 * u.u_shadowFactor;
+  let shadow = exp(-abs(merged) * u_resolution1x.y / safeShadowExpand) * 0.6 * u.u_shadowFactor;
 
   return vec4f(bgColor - vec3f(shadow), 1.0);
 }
